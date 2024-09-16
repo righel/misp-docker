@@ -12,9 +12,6 @@ FROM "${DOCKER_HUB_PROXY}python:3.12-slim-bookworm" AS php-base
         lsb-release \
         ca-certificates \
         curl
-    RUN curl -sSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
-    RUN dpkg -i /tmp/debsuryorg-archive-keyring.deb
-    RUN echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
     RUN apt-get update
 
 
@@ -25,18 +22,18 @@ FROM php-base AS composer-build
     ARG CORE_COMMIT
 
     RUN apt-get install -y --no-install-recommends \
-        php7.4 \
-        php7.4-apcu \
-        php7.4-curl \
-        php7.4-xml \
-        php7.4-intl \
-        php7.4-bcmath \
-        php7.4-mbstring \
-        php7.4-mysql \
-        php7.4-redis \
-        php7.4-gd \
-        php7.4-fpm \
-        php7.4-zip \
+        php8.2 \
+        php8.2-apcu \
+        php8.2-curl \
+        php8.2-xml \
+        php8.2-intl \
+        php8.2-bcmath \
+        php8.2-mbstring \
+        php8.2-mysql \
+        php8.2-redis \
+        php8.2-gd \
+        php8.2-fpm \
+        php8.2-zip \
         unzip \
         && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
@@ -64,10 +61,11 @@ FROM php-base AS php-build
     RUN apt-get install -y --no-install-recommends \
         gcc \
         g++ \
+        git \
         make \
-        php7.4 \
-        php7.4-dev \
-        php7.4-xml \
+        php8.2 \
+        php8.2-dev \
+        php8.2-xml \
         php-pear \
         libbrotli-dev \
         libfuzzy-dev \
@@ -76,18 +74,23 @@ FROM php-base AS php-build
         libzstd-dev \
         && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-    RUN update-alternatives --set php /usr/bin/php7.4
-    RUN update-alternatives --set php-config /usr/bin/php-config7.4
-    RUN update-alternatives --set phpize /usr/bin/phpize7.4
+    RUN update-alternatives --set php /usr/bin/php8.2
+    RUN update-alternatives --set php-config /usr/bin/php-config8.2
+    RUN update-alternatives --set phpize /usr/bin/phpize8.2
 
     RUN cp "/usr/lib/$(gcc -dumpmachine)"/libfuzzy.* /usr/lib
     RUN pecl channel-update pecl.php.net && \
-        pecl install ssdeep && \
         pecl install rdkafka && \
         pecl install simdjson && \
         pecl install zstd && \
         pecl install brotli
 
+    # patch and install pecl ssdeep
+    COPY patches/ssdeep.patch /tmp/ssdeep.patch
+    RUN git clone --recursive --depth=1 https://github.com/php/pecl-text-ssdeep.git /tmp/pecl-text-ssdeep
+    WORKDIR /tmp/pecl-text-ssdeep
+    RUN git apply /tmp/ssdeep.patch
+    RUN phpize && ./configure && make && make install
 
 FROM php-base AS python-build
     ENV DEBIAN_FRONTEND noninteractive   
@@ -186,19 +189,19 @@ FROM php-base
         mariadb-client \
         rsync \
         # PHP Requirements
-        php7.4 \
-        php7.4-apcu \
-        php7.4-curl \
-        php7.4-xml \
-        php7.4-intl \
-        php7.4-bcmath \
-        php7.4-mbstring \
-        php7.4-mysql \
-        php7.4-redis \
-        php7.4-gd \
-        php7.4-fpm \
-        php7.4-zip \
-        php7.4-ldap \
+        php8.2 \
+        php8.2-apcu \
+        php8.2-curl \
+        php8.2-xml \
+        php8.2-intl \
+        php8.2-bcmath \
+        php8.2-mbstring \
+        php8.2-mysql \
+        php8.2-redis \
+        php8.2-gd \
+        php8.2-fpm \
+        php8.2-zip \
+        php8.2-ldap \
         libmagic1 \
         libldap-common \
         librdkafka1 \
@@ -213,7 +216,7 @@ FROM php-base
         curl jq \
         && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-    RUN update-alternatives --set php /usr/bin/php7.4
+    RUN update-alternatives --set php /usr/bin/php8.2
 
     # Install python modules
     COPY --from=python-build /wheels /wheels
