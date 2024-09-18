@@ -47,10 +47,10 @@ Keeping the image up-to-date with upstream should be as simple as running `docke
 The `docker-compose.yml` file allows further configuration settings:
 
 ```
-"MYSQL_HOST=db"
-"MYSQL_USER=misp"
-"MYSQL_PASSWORD=example"    # NOTE: This should be AlphaNum with no Special Chars. Otherwise, edit config files after first run.
-"MYSQL_DATABASE=misp"
+"POSTGRES_HOST=db"
+"POSTGRES_USER=misp"
+"POSTGRES_PASSWORD=example"    # NOTE: This should be AlphaNum with no Special Chars. Otherwise, edit config files after first run.
+"POSTGRES_DB=misp"
 "MISP_MODULES_FQDN=http://misp-modules" # Set the MISP Modules FQDN, used for Enrichment_services_url/Import_services_url/Export_services_url
 "WORKERS=1"                 # Legacy variable controlling the number of parallel workers (use variables below instead)
 "NUM_WORKERS_DEFAULT=5"     # To set the number of default workers
@@ -157,13 +157,14 @@ Copy the following directories and files:
 - Content of `experimental/podman-systemd` to `$USER/.config/containers/systemd/`
 - `template.vars` to `$USER/.config/containers/systemd/vars.env`
 
-Edit `vars.env`, and initialize the following MySQL settings: 
+Edit `vars.env`, and initialize the following PostgreSQL settings: 
 ```bash
-MYSQL_HOST=
-MYSQL_USER=
-MYSQL_PASSWORD=
-MYSQL_ROOT_PASSWORD=
-MYSQL_DATABASE=
+POSTGRES_HOSTNAME=
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_ROOT_PASSWORD=
+POSTGRES_DB=
+POSTGRES_PORT=
 ```
 
 Set the Redis password:

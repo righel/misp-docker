@@ -22,33 +22,23 @@ services:
       start_period: 30s
 
   db:
-    # We use MariaDB because it supports ARM and has the expected collations
-    image: mariadb:10.11
+    image: postgres:16.3
     restart: always
     environment:
-      - "MYSQL_USER=${MYSQL_USER:-misp}"
-      - "MYSQL_PASSWORD=${MYSQL_PASSWORD:-example}"
-      - "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-password}"
-      - "MYSQL_DATABASE=${MYSQL_DATABASE:-misp}"
-    command: "\
-      --innodb-buffer-pool-size=${INNODB_BUFFER_POOL_SIZE:-2048M} \
-      --innodb-change-buffering=${INNODB_CHANGE_BUFFERING:-none} \
-      --innodb-io-capacity=${INNODB_IO_CAPACITY:-1000} \
-      --innodb-io-capacity-max=${INNODB_IO_CAPACITY_MAX:-2000} \
-      --innodb-log-file-size=${INNODB_LOG_FILE_SIZE:-600M} \
-      --innodb-read-io-threads=${INNODB_READ_IO_THREADS:-16} \
-      --innodb-stats-persistent=${INNODB_STATS_PERSISTENT:-ON} \
-      --innodb-write-io-threads=${INNODB_WRITE_IO_THREADS:-4}"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    cap_add:
-      - SYS_NICE  # CAP_SYS_NICE Prevent runaway mysql log
+      - "POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-db}"
+      - "POSTGRES_USER=${POSTGRES_USER:-misp}"
+      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-example}"
+      - "POSTGRES_ROOT_PASSWORD=${POSTGRES_PASSWORD:-password}"
+      - "POSTGRES_PORT=${POSTGRES_PORT:-5432}"
+      - "POSTGRES_DB=${POSTGRES_DB:-misp}"
     healthcheck:
-      test: mysqladmin --user=$$MYSQL_USER --password=$$MYSQL_PASSWORD status
+      test: "pg_isready --username=$$POSTGRES_USER --dbname=$$POSTGRES_DB"
       interval: 2s
       timeout: 1s
       retries: 3
       start_period: 30s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
 
   misp-core:
     image: ghcr.io/misp/misp-docker/misp-core:${CORE_RUNNING_TAG:-latest}
@@ -168,12 +158,13 @@ services:
           "pull_rules": "${SYNCSERVERS_1_PULL_RULES}",
           "pull": true
         }
-      # mysql settings
-      - "MYSQL_HOST=${MYSQL_HOST:-db}"
-      - "MYSQL_PORT=${MYSQL_PORT:-3306}"
-      - "MYSQL_USER=${MYSQL_USER:-misp}"
-      - "MYSQL_PASSWORD=${MYSQL_PASSWORD:-example}"
-      - "MYSQL_DATABASE=${MYSQL_DATABASE:-misp}"
+      # postgres settings
+      - "POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-db}"
+      - "POSTGRES_USER=${POSTGRES_USER:-misp}"
+      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-example}"
+      - "POSTGRES_ROOT_PASSWORD=${POSTGRES_PASSWORD:-password}"
+      - "POSTGRES_PORT=${POSTGRES_PORT:-5432}"
+      - "POSTGRES_DB=${POSTGRES_DB:-misp}"
       # redis settings
       - "REDIS_HOST=${REDIS_HOST:-redis}"
       - "REDIS_PORT=${REDIS_PORT:-6379}"
@@ -192,7 +183,7 @@ services:
       - "PHP_UPLOAD_MAX_FILESIZE=${PHP_UPLOAD_MAX_FILESIZE:-50M}"
       - "PHP_POST_MAX_SIZE=${PHP_POST_MAX_SIZE:-50M}"
       - "PHP_MAX_INPUT_TIME:${PHP_MAX_INPUT_TIME:-300}"
-  
+
   misp-modules:
     image: ghcr.io/misp/misp-docker/misp-modules:${MODULES_RUNNING_TAG:-latest}
     build:
@@ -210,4 +201,4 @@ services:
         condition: service_healthy
 
 volumes:
-    mysql_data:
+    postgres-data:

@@ -8,28 +8,28 @@ term_proc() {
 
 trap term_proc SIGTERM
 
-init_mysql(){
-    # Test when MySQL is ready....
+init_postgres() {
+    # Test when PostgreSQL is ready....
     # wait for Database come ready
-    isDBup () {
-        echo "SHOW STATUS" | $MYSQL_CMD 1>/dev/null
+    isDBup() {
+        echo "SHOW STATUS" | $POSTGRES_CMD 1>/dev/null
         echo $?
     }
 
-    isDBinitDone () {
+    isDBinitDone() {
         # Table attributes has existed since at least v2.1
-        echo "DESCRIBE attributes" | $MYSQL_CMD 1>/dev/null
+        echo "DESCRIBE attributes" | $POSTGRES_CMD 1>/dev/null
         echo $?
     }
 
     RETRY=100
-    until [ $(isDBup) -eq 0 ] || [ $RETRY -le 0 ] ; do
+    until [ $(isDBup) -eq 0 ] || [ $RETRY -le 0 ]; do
         echo "... waiting for database to come up"
         sleep 5
-        RETRY=$(( RETRY - 1))
+        RETRY=$((RETRY - 1))
     done
     if [ $RETRY -le 0 ]; then
-        >&2 echo "... error: Could not connect to Database on $MYSQL_HOST:$MYSQL_PORT"
+        echo >&2 "... error: Could not connect to Database on $POSTGRES_HOSTNAME:$POSTGRES_PORT"
         exit 1
     fi
 
@@ -37,12 +37,14 @@ init_mysql(){
         echo "... database has already been initialized"
         export DB_ALREADY_INITIALISED=true
     else
-        echo "... database has not been initialized, importing MySQL scheme..."
-        $MYSQL_CMD < /var/www/MISP/INSTALL/MYSQL.sql
+        echo "... database has not been initialized, running Phinx migrations ..."
+        sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx migrate -c /var/www/MISP/app/Config/MISP/phinx.php
+        echo "... running Phinx seeds ..."
+        sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx seed:run -c /var/www/MISP/app/Config/MISP/phinx.php
     fi
 }
 
-init_misp_data_files(){
+init_misp_data_files() {
     # Init config (shared with host)
     echo "... initialize configuration files"
     MISP_APP_CONFIG_PATH=/var/www/MISP/app/Config
@@ -57,27 +59,37 @@ init_misp_data_files(){
     [ -f $MISP_APP_CONFIG_PATH/database.php ] || dd if=$MISP_APP_CONFIG_PATH.dist/database.default.php of=$MISP_APP_CONFIG_PATH/database.php
     [ -f $MISP_APP_CONFIG_PATH/core.php ] || dd if=$MISP_APP_CONFIG_PATH.dist/core.default.php of=$MISP_APP_CONFIG_PATH/core.php
     [ -f $MISP_APP_CONFIG_PATH/config.php.template ] || dd if=$MISP_APP_CONFIG_PATH.dist/config.default.php of=$MISP_APP_CONFIG_PATH/config.php.template
-    [ -f $MISP_APP_CONFIG_PATH/config.php ] || echo -e "<?php\n\$config=array();\n?>" > $MISP_APP_CONFIG_PATH/config.php
+    [ -f $MISP_APP_CONFIG_PATH/config.php ] || echo -e "<?php\n\$config=array();\n?>" >$MISP_APP_CONFIG_PATH/config.php
     [ -f $MISP_APP_CONFIG_PATH/email.php ] || dd if=$MISP_APP_CONFIG_PATH.dist/email.php of=$MISP_APP_CONFIG_PATH/email.php
     [ -f $MISP_APP_CONFIG_PATH/routes.php ] || dd if=$MISP_APP_CONFIG_PATH.dist/routes.php of=$MISP_APP_CONFIG_PATH/routes.php
 
     echo "... initialize database.php settings"
     # workaround for https://forums.docker.com/t/sed-couldnt-open-temporary-file-xyz-permission-denied-when-using-virtiofs/125473
-    # sed -i "s/localhost/$MYSQL_HOST/" $MISP_APP_CONFIG_PATH/database.php
-    # sed -i "s/db\s*login/$MYSQL_USER/" $MISP_APP_CONFIG_PATH/database.php
-    # sed -i "s/3306/$MYSQL_PORT/" $MISP_APP_CONFIG_PATH/database.php
-    # sed -i "s/db\s*password/$MYSQL_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php
-    # sed -i "s/'database' => 'misp'/'database' => '$MYSQL_DATABASE'/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/localhost/$POSTGRES_HOSTNAME/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/db\s*login/$POSTGRES_USER/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/3306/$POSTGRES_PORT/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/db\s*password/$POSTGRES_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php
+    # sed -i "s/'database' => 'misp'/'database' => '$POSTGRES_DB'/" $MISP_APP_CONFIG_PATH/database.php
     chmod +w $MISP_APP_CONFIG_PATH/database.php
-    sed "s/localhost/$MYSQL_HOST/" $MISP_APP_CONFIG_PATH/database.php > tmp; cat tmp > $MISP_APP_CONFIG_PATH/database.php; rm tmp
-    sed "s/db\s*login/$MYSQL_USER/" $MISP_APP_CONFIG_PATH/database.php > tmp; cat tmp > $MISP_APP_CONFIG_PATH/database.php; rm tmp
-    sed "s/3306/$MYSQL_PORT/" $MISP_APP_CONFIG_PATH/database.php > tmp; cat tmp > $MISP_APP_CONFIG_PATH/database.php; rm tmp
-    sed "s/db\s*password/$MYSQL_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php > tmp; cat tmp > $MISP_APP_CONFIG_PATH/database.php; rm tmp
-    sed "s/'database' => 'misp'/'database' => '$MYSQL_DATABASE'/" $MISP_APP_CONFIG_PATH/database.php > tmp; cat tmp > $MISP_APP_CONFIG_PATH/database.php; rm tmp
+    sed "s/localhost/$POSTGRES_HOSTNAME/" $MISP_APP_CONFIG_PATH/database.php >tmp
+    cat tmp >$MISP_APP_CONFIG_PATH/database.php
+    rm tmp
+    sed "s/db\s*login/$POSTGRES_USER/" $MISP_APP_CONFIG_PATH/database.php >tmp
+    cat tmp >$MISP_APP_CONFIG_PATH/database.php
+    rm tmp
+    sed "s/5432/$POSTGRES_PORT/" $MISP_APP_CONFIG_PATH/database.php >tmp
+    cat tmp >$MISP_APP_CONFIG_PATH/database.php
+    rm tmp
+    sed "s/db\s*password/$POSTGRES_PASSWORD/" $MISP_APP_CONFIG_PATH/database.php >tmp
+    cat tmp >$MISP_APP_CONFIG_PATH/database.php
+    rm tmp
+    sed "s/'database' => 'misp'/'database' => '$POSTGRES_DB'/" $MISP_APP_CONFIG_PATH/database.php >tmp
+    cat tmp >$MISP_APP_CONFIG_PATH/database.php
+    rm tmp
 
     echo "... initialize email.php settings"
     chmod +w $MISP_APP_CONFIG_PATH/email.php
-    tee $MISP_APP_CONFIG_PATH/email.php > /dev/null <<EOT
+    tee $MISP_APP_CONFIG_PATH/email.php >/dev/null <<EOT
 <?php
 class EmailConfig {
     public \$default = array(
@@ -137,9 +149,9 @@ EOT
     fi
 }
 
-update_misp_data_files(){
+update_misp_data_files() {
     for DIR in $(ls /var/www/MISP/app/files.dist); do
-        if [ "$DIR" = "certs" ] || [ "$DIR" = "img" ] || [ "$DIR" == "taxonomies" ] ; then
+        if [ "$DIR" = "certs" ] || [ "$DIR" = "img" ] || [ "$DIR" == "taxonomies" ]; then
             echo "... rsync -azh \"/var/www/MISP/app/files.dist/$DIR\" \"/var/www/MISP/app/files/\""
             rsync -azh "/var/www/MISP/app/files.dist/$DIR" "/var/www/MISP/app/files/"
         else
@@ -149,7 +161,7 @@ update_misp_data_files(){
     done
 }
 
-enforce_misp_data_permissions(){
+enforce_misp_data_permissions() {
     echo "... chown -R www-data:www-data /var/www/MISP/app/tmp" && find /var/www/MISP/app/tmp \( ! -user www-data -or ! -group www-data \) -exec chown www-data:www-data {} +
     # Files are also executable and read only, because we have some rogue scripts like 'cake' and we can not do a full inventory
     echo "... chmod -R 0550 files /var/www/MISP/app/tmp" && find /var/www/MISP/app/tmp -not -perm 550 -type f -exec chmod 0550 {} +
@@ -157,7 +169,7 @@ enforce_misp_data_permissions(){
     echo "... chmod -R 0770 directories /var/www/MISP/app/tmp" && find /var/www/MISP/app/tmp -not -perm 770 -type d -exec chmod 0770 {} +
     # We make 'files' and 'tmp' (logs) directories and files user and group writable (we removed the SGID bit)
     echo "... chmod -R u+w,g+w /var/www/MISP/app/tmp" && chmod -R u+w,g+w /var/www/MISP/app/tmp
-    
+
     echo "... chown -R www-data:www-data /var/www/MISP/app/files" && find /var/www/MISP/app/files \( ! -user www-data -or ! -group www-data \) -exec chown www-data:www-data {} +
     # Files are also executable and read only, because we have some rogue scripts like 'cake' and we can not do a full inventory
     echo "... chmod -R 0550 files /var/www/MISP/app/files" && find /var/www/MISP/app/files -not -perm 550 -type f -exec chmod 0550 {} +
@@ -165,7 +177,7 @@ enforce_misp_data_permissions(){
     echo "... chmod -R 0770 directories /var/www/MISP/app/files" && find /var/www/MISP/app/files -not -perm 770 -type d -exec chmod 0770 {} +
     # We make 'files' and 'tmp' (logs) directories and files user and group writable (we removed the SGID bit)
     echo "... chmod -R u+w,g+w /var/www/MISP/app/files" && chmod -R u+w,g+w /var/www/MISP/app/files
-    
+
     echo "... chown -R www-data:www-data /var/www/MISP/app/Config" && find /var/www/MISP/app/Config \( ! -user www-data -or ! -group www-data \) -exec chown www-data:www-data {} +
     # Files are also executable and read only, because we have some rogue scripts like 'cake' and we can not do a full inventory
     echo "... chmod -R 0550 files /var/www/MISP/app/Config ..." && find /var/www/MISP/app/Config -not -perm 550 -type f -exec chmod 0550 {} +
@@ -176,8 +188,8 @@ enforce_misp_data_permissions(){
 }
 
 flip_nginx() {
-    local live="$1";
-    local reload="$2";
+    local live="$1"
+    local reload="$2"
 
     if [[ "$live" = "true" ]]; then
         NGINX_DOC_ROOT=/var/www/MISP/app/webroot
@@ -264,7 +276,7 @@ init_nginx() {
         echo "... enabling IPv6 on port 443"
         sed -i "s/# listen \[/listen \[/" /etc/nginx/sites-enabled/misp443
     fi
-    
+
     if [[ ! -f /etc/nginx/certs/cert.pem || ! -f /etc/nginx/certs/key.pem ]]; then
         echo "... generating new self-signed TLS certificate"
         openssl req -x509 -subj '/CN=localhost' -nodes -newkey rsa:4096 -keyout /etc/nginx/certs/key.pem -out /etc/nginx/certs/cert.pem -days 365 \
@@ -272,7 +284,7 @@ init_nginx() {
     else
         echo "... TLS certificates found"
     fi
-    
+
     if [[ ! -f /etc/nginx/certs/dhparams.pem ]]; then
         echo "... generating new DH parameters"
         openssl dhparam -out /etc/nginx/certs/dhparams.pem 2048
@@ -283,13 +295,13 @@ init_nginx() {
     flip_nginx false false
 }
 
-
-# Initialize MySQL
-echo "INIT | Initialize MySQL ..." && init_mysql
+# Initialize PostgreSQL
+echo "INIT | Initialize PostgreSQL ..." && init_posgres
 
 # Initialize NGINX
 echo "INIT | Initialize NGINX ..." && init_nginx
-nginx -g 'daemon off;' & master_pid=$!
+nginx -g 'daemon off;' &
+master_pid=$!
 
 # Initialize MISP
 echo "INIT | Initialize MISP files and configurations ..." && init_misp_data_files

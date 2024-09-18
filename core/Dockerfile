@@ -29,7 +29,7 @@ FROM php-base AS composer-build
         php8.2-intl \
         php8.2-bcmath \
         php8.2-mbstring \
-        php8.2-mysql \
+        php8.2-pgsql \
         php8.2-redis \
         php8.2-gd \
         php8.2-fpm \
@@ -196,7 +196,7 @@ FROM php-base
         php8.2-intl \
         php8.2-bcmath \
         php8.2-mbstring \
-        php8.2-mysql \
+        php8.2-pgsql \
         php8.2-redis \
         php8.2-gd \
         php8.2-fpm \

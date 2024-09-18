@@ -26,7 +26,7 @@ setting_is_set_alt() {
     if $setting_in_config_file; then
         return 0
     elif $db_settings_enabled; then
-        local setting_in_db=$(echo "SELECT EXISTS(SELECT 1 FROM $MYSQL_DATABASE.system_settings WHERE setting = \"${setting}\");" | ${MYSQL_CMD})
+        local setting_in_db=$(echo "SELECT EXISTS(SELECT 1 FROM $POSTGRES_DB.system_settings WHERE setting = \"${setting}\");" | ${MYSQL_CMD})
         if [[ $setting_in_db -eq 1 ]]; then
             return 0
         fi
