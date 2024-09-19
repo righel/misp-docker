@@ -12,13 +12,7 @@ init_postgres() {
     # Test when PostgreSQL is ready....
     # wait for Database come ready
     isDBup() {
-        echo "SHOW STATUS" | $POSTGRES_CMD 1>/dev/null
-        echo $?
-    }
-
-    isDBinitDone() {
-        # Table attributes has existed since at least v2.1
-        echo "DESCRIBE attributes" | $POSTGRES_CMD 1>/dev/null
+        echo "\c $POSTGRES_DB" | $POSTGRES_CMD 1>/dev/null
         echo $?
     }
 
@@ -28,20 +22,18 @@ init_postgres() {
         sleep 5
         RETRY=$((RETRY - 1))
     done
+
     if [ $RETRY -le 0 ]; then
         echo >&2 "... error: Could not connect to Database on $POSTGRES_HOSTNAME:$POSTGRES_PORT"
         exit 1
     fi
 
-    if [ $(isDBinitDone) -eq 0 ]; then
-        echo "... database has already been initialized"
-        export DB_ALREADY_INITIALISED=true
-    else
-        echo "... database has not been initialized, running Phinx migrations ..."
-        sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx migrate -c /var/www/MISP/app/Config/MISP/phinx.php
-        echo "... running Phinx seeds ..."
-        sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx seed:run -c /var/www/MISP/app/Config/MISP/phinx.php
-    fi
+    echo "... running Phinx migrations ..."
+    sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx migrate -c /var/www/MISP/app/phinx.php -e production
+
+    # FIXME not idempotent, but we need to run seeds only once
+    echo "... running Phinx seeds ..."
+    sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx seed:run -c /var/www/MISP/app/phinx.php -e production
 }
 
 init_misp_data_files() {
@@ -296,7 +288,7 @@ init_nginx() {
 }
 
 # Initialize PostgreSQL
-echo "INIT | Initialize PostgreSQL ..." && init_posgres
+echo "INIT | Initialize PostgreSQL ..." && init_postgres
 
 # Initialize NGINX
 echo "INIT | Initialize NGINX ..." && init_nginx

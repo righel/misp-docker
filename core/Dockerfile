@@ -186,7 +186,7 @@ FROM php-base
         openssl \
         gpg \
         gpg-agent \
-        mariadb-client \
+        postgresql-client \
         rsync \
         # PHP Requirements
         php8.2 \
