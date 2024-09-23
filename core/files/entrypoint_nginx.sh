@@ -30,10 +30,6 @@ init_postgres() {
 
     echo "... running Phinx migrations ..."
     sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx migrate -c /var/www/MISP/app/phinx.php -e production
-
-    # FIXME not idempotent, but we need to run seeds only once
-    echo "... running Phinx seeds ..."
-    sudo -u www-data /var/www/MISP/app/Vendor/bin/phinx seed:run -c /var/www/MISP/app/phinx.php -e production
 }
 
 init_misp_data_files() {
